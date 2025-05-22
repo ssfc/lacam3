@@ -19,8 +19,7 @@ static const std::regex r_height = std::regex(R"(height\s(\d+))");
 static const std::regex r_width = std::regex(R"(width\s(\d+))");
 static const std::regex r_map = std::regex(R"(map)");
 
-Graph::Graph(const std::vector<std::vector<int>> &map)
-    : V(Vertices()), width(0), height(0)
+Graph::Graph(const std::vector<std::vector<int>> &map) : V(Vertices()), width(0), height(0)
 {
   width = map[0].size();
   height = map.size();
@@ -28,10 +27,12 @@ Graph::Graph(const std::vector<std::vector<int>> &map)
 
   // create vertices
   // int index = 0;
-  for (int y = 0; y < height; ++y) {
-    for (int x = 0; x < width; ++x) {
-      if (map[x][y] != 0) continue;  // obstacle
-      auto index = width * y + x;
+  for (int x = 0; x < height; ++x) {
+    for (int y = 0; y < width; ++y) {
+      // printf("x: %d, y: %d\n", x, y);
+      if (map[x][y] == 1) continue;  // obstacle
+      auto index = width * x + y;
+      // printf("index: %d\n", index);
       auto v = new Vertex(V.size(), index, x, y);
       V.push_back(v);
       U[index] = v;
@@ -40,28 +41,28 @@ Graph::Graph(const std::vector<std::vector<int>> &map)
   }
 
   // create edges
-  for (int y = 0; y < height; ++y) {
-    for (int x = 0; x < width; ++x) {
-      auto v = U[width * y + x];
+  for (int x = 0; x < height; ++x) {
+    for (int y = 0; y < width; ++y) {
+      auto v = U[width * x + y];
       if (v == nullptr) continue;
       // left
-      if (x > 0) {
-        auto u = U[width * y + (x - 1)];
+      if (y > 0) {
+        auto u = U[width * x + (y - 1)];
         if (u != nullptr) v->neighbor.push_back(u);
       }
       // right
-      if (x < width - 1) {
-        auto u = U[width * y + (x + 1)];
+      if (y < width - 1) {
+        auto u = U[width * x + (y + 1)];
         if (u != nullptr) v->neighbor.push_back(u);
       }
       // up
-      if (y < height - 1) {
-        auto u = U[width * (y + 1) + x];
+      if (x < height - 1) {
+        auto u = U[width * (x + 1) + y];
         if (u != nullptr) v->neighbor.push_back(u);
       }
       // down
-      if (y > 0) {
-        auto u = U[width * (y - 1) + x];
+      if (x > 0) {
+        auto u = U[width * (x - 1) + y];
         if (u != nullptr) v->neighbor.push_back(u);
       }
     }
