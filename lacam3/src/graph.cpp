@@ -30,7 +30,7 @@ Graph::Graph(const std::vector<std::vector<int>> &map) : V(Vertices()), width(0)
   for (int x = 0; x < height; ++x) {
     for (int y = 0; y < width; ++y) {
       // printf("x: %d, y: %d\n", x, y);
-      if (map[x][y] == 1) continue;  // obstacle
+      if (map[x][y] != 0) continue;  // obstacle
       auto index = width * x + y;
       // printf("index: %d\n", index);
       auto v = new Vertex(V.size(), index, x, y);
