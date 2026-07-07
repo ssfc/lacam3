@@ -1,5 +1,14 @@
 #include "../include/pibt.hpp"
 
+bool PIBT::FLG_VERTEX_CONFLICT_BY_INDEX = false;
+
+namespace {
+int vertex_conflict_key(const Vertex *v)
+{
+  return PIBT::FLG_VERTEX_CONFLICT_BY_INDEX ? v->index : v->id;
+}
+}
+
 PIBT::PIBT(const Instance *_ins, DistTable *_D, int seed, bool _flg_swap,
            Scatter *_scatter)
     : ins(_ins),
@@ -26,22 +35,24 @@ bool PIBT::set_new_config(const Config &Q_from, Config &Q_to,
   // setup cache & constraints check
   for (auto i = 0; i < N; ++i) {
     // set occupied now
-    occupied_now[Q_from[i]->id] = i;
+    occupied_now[vertex_conflict_key(Q_from[i])] = i;
 
     // set occupied next
     if (Q_to[i] != nullptr) {
       // vertex collision
-      if (occupied_next[Q_to[i]->id] != NO_AGENT) {
+      if (occupied_next[vertex_conflict_key(Q_to[i])] != NO_AGENT) {
         success = false;
         break;
       }
       // swap collision
-      auto j = occupied_now[Q_to[i]->id];
-      if (j != NO_AGENT && j != i && Q_to[j] == Q_from[i]) {
+      auto j = occupied_now[vertex_conflict_key(Q_to[i])];
+      if (j != NO_AGENT && j != i &&
+          Q_to[j] != nullptr &&
+          vertex_conflict_key(Q_to[j]) == vertex_conflict_key(Q_from[i])) {
         success = false;
         break;
       }
-      occupied_next[Q_to[i]->id] = i;
+      occupied_next[vertex_conflict_key(Q_to[i])] = i;
     }
   }
 
@@ -56,8 +67,8 @@ bool PIBT::set_new_config(const Config &Q_from, Config &Q_to,
 
   // cleanup
   for (auto i = 0; i < N; ++i) {
-    occupied_now[Q_from[i]->id] = NO_AGENT;
-    if (Q_to[i] != nullptr) occupied_next[Q_to[i]->id] = NO_AGENT;
+    occupied_now[vertex_conflict_key(Q_from[i])] = NO_AGENT;
+    if (Q_to[i] != nullptr) occupied_next[vertex_conflict_key(Q_to[i])] = NO_AGENT;
   }
 
   return success;
@@ -106,10 +117,10 @@ bool PIBT::funcPIBT(const int i, const Config &Q_from, Config &Q_to)
   auto swap_operation = [&]() {
     if (swap_agent != NO_AGENT &&                 // swap_agent exists
         Q_to[swap_agent] == nullptr &&            // not decided
-        occupied_next[Q_from[i]->id] == NO_AGENT  // free
+        occupied_next[vertex_conflict_key(Q_from[i])] == NO_AGENT  // free
     ) {
       // pull swap_agent
-      occupied_next[Q_from[i]->id] = swap_agent;
+      occupied_next[vertex_conflict_key(Q_from[i])] = swap_agent;
       Q_to[swap_agent] = Q_from[i];
     }
   };
@@ -119,15 +130,18 @@ bool PIBT::funcPIBT(const int i, const Config &Q_from, Config &Q_to)
     auto u = C_next[i][k];
 
     // avoid vertex conflicts
-    if (occupied_next[u->id] != NO_AGENT) continue;
+    if (occupied_next[vertex_conflict_key(u)] != NO_AGENT) continue;
 
-    const auto j = occupied_now[u->id];
+    const auto j = occupied_now[vertex_conflict_key(u)];
 
     // avoid swap conflicts with constraints
-    if (j != NO_AGENT && Q_to[j] == Q_from[i]) continue;
+    if (j != NO_AGENT &&
+        Q_to[j] != nullptr &&
+        vertex_conflict_key(Q_to[j]) == vertex_conflict_key(Q_from[i]))
+      continue;
 
     // reserve next location
-    occupied_next[u->id] = i;
+    occupied_next[vertex_conflict_key(u)] = i;
     Q_to[i] = u;
 
     // priority inheritance
@@ -141,7 +155,7 @@ bool PIBT::funcPIBT(const int i, const Config &Q_from, Config &Q_to)
   }
 
   // failed to secure node
-  occupied_next[Q_from[i]->id] = i;
+  occupied_next[vertex_conflict_key(Q_from[i])] = i;
   Q_to[i] = Q_from[i];
   return false;
 }
@@ -150,7 +164,7 @@ int PIBT::is_swap_required_and_possible(const int i, const Config &Q_from,
                                         Config &Q_to)
 {
   // agent-j occupying the desired vertex for agent-i
-  const auto j = occupied_now[C_next[i][0]->id];
+  const auto j = occupied_now[vertex_conflict_key(C_next[i][0])];
   if (j != NO_AGENT && j != i &&  // j exists
       Q_to[j] == nullptr &&       // j does not decide next location
       is_swap_required(i, j, Q_from[i], Q_from[j]) &&  // swap required
@@ -162,7 +176,7 @@ int PIBT::is_swap_required_and_possible(const int i, const Config &Q_from,
   // for clear operation, c.f., push & swap
   if (C_next[i][0] != Q_from[i]) {
     for (auto u : Q_from[i]->neighbor) {
-      const auto k = occupied_now[u->id];
+      const auto k = occupied_now[vertex_conflict_key(u)];
       if (k != NO_AGENT &&              // k exists
           C_next[i][0] != Q_from[k] &&  // this is for clear operation
           is_swap_required(k, i, Q_from[i],
@@ -185,7 +199,7 @@ bool PIBT::is_swap_required(const int pusher, const int puller,
     auto n = v_puller->neighbor.size();
     // remove agents who need not to move
     for (auto u : v_puller->neighbor) {
-      const auto i = occupied_now[u->id];
+      const auto i = occupied_now[vertex_conflict_key(u)];
       if (u == v_pusher ||
           (u->neighbor.size() == 1 && i != NO_AGENT && ins->goals[i] == u)) {
         --n;
@@ -213,7 +227,7 @@ bool PIBT::is_swap_possible(Vertex *v_pusher_origin, Vertex *v_puller_origin)
   while (v_puller != v_pusher_origin) {  // avoid loop
     auto n = v_puller->neighbor.size();
     for (auto u : v_puller->neighbor) {
-      const auto i = occupied_now[u->id];
+      const auto i = occupied_now[vertex_conflict_key(u)];
       if (u == v_pusher ||
           (u->neighbor.size() == 1 && i != NO_AGENT && ins->goals[i] == u)) {
         --n;

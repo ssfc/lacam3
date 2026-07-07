@@ -1,5 +1,7 @@
 #include "../include/dist_table.hpp"
 
+bool DistTable::FLG_DIRECTED_REVERSE_DISTANCE = false;
+
 DistTable::DistTable(const Instance &ins)
     : K(ins.G->V.size()), table(ins.N, std::vector<int>(K, K))
 {
@@ -14,6 +16,16 @@ DistTable::DistTable(const Instance *ins)
 
 void DistTable::setup(const Instance *ins)
 {
+  std::vector<std::vector<Vertex *>> reverse_neighbors;
+  if (FLG_DIRECTED_REVERSE_DISTANCE) {
+    reverse_neighbors.assign(K, std::vector<Vertex *>());
+    for (auto v : ins->G->V) {
+      for (auto u : v->neighbor) {
+        reverse_neighbors[u->id].push_back(v);
+      }
+    }
+  }
+
   auto bfs = [&](const int i) {
     auto g_i = ins->goals[i];
     auto Q = std::queue<Vertex *>({g_i});
@@ -22,7 +34,9 @@ void DistTable::setup(const Instance *ins)
       auto n = Q.front();
       Q.pop();
       const int d_n = table[i][n->id];
-      for (auto &m : n->neighbor) {
+      const auto &nexts =
+          FLG_DIRECTED_REVERSE_DISTANCE ? reverse_neighbors[n->id] : n->neighbor;
+      for (auto &m : nexts) {
         const int d_m = table[i][m->id];
         if (d_n + 1 >= d_m) continue;
         table[i][m->id] = d_n + 1;

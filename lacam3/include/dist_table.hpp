@@ -8,6 +8,8 @@
 #include "utils.hpp"
 
 struct DistTable {
+  static bool FLG_DIRECTED_REVERSE_DISTANCE;
+
   const int K;  // number of vertices
   std::vector<std::vector<int>>
       table;  // distance table, index: agent-id & vertex-id

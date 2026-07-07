@@ -24,6 +24,7 @@
 #include <vector>
 
 using Time = std::chrono::steady_clock;
+using uint = unsigned int;
 
 // time manager
 struct Deadline {

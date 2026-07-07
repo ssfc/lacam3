@@ -14,6 +14,8 @@
 #include "utils.hpp"
 
 struct PIBT {
+  static bool FLG_VERTEX_CONFLICT_BY_INDEX;
+
   const Instance *ins;
   std::mt19937 MT;
 
